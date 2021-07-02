@@ -1,4 +1,5 @@
-const { ApolloServer, gql } = require('apollo-server')
+const { ApolloServer, UserInputError, gql } = require('apollo-server')
+const { v1: uuid } = require('uuid')
 
 let authors = [
   {
@@ -92,6 +93,7 @@ const typeDefs = gql`
   type Author {
     name: String!
     bookCount: Int!
+    born: Int
     id: ID!
   }
 
@@ -106,8 +108,18 @@ const typeDefs = gql`
   type Query {
     bookCount: Int!
     authorCount: Int!
-    allBooks(author: String): [Book!]!
+    allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author!]!
+  }
+
+  type Mutation {
+    addBook(
+      title: String!
+      author: String!
+      published: Int!
+      genres: [String]
+    ): Book
+    editAuthor(name: String!, setBornTo: Int!): Author
   }
 `
 
@@ -116,13 +128,40 @@ const resolvers = {
     bookCount: () => books.length,
     authorCount: () => authors.length,
     allBooks: (root, args) => {
-      if (!args.author) return books
-      return books.filter(b => b.author === args.author)
+      let booksAtEnd = [...books]
+      if (!args.author && !args.genre) return books
+      if (args.author)
+        booksAtEnd = booksAtEnd.filter(b => b.author === args.author)
+      if (args.genre)
+        booksAtEnd = booksAtEnd.filter(b => b.genres.includes(args.genre))
+      return booksAtEnd
     },
     allAuthors: () => authors,
   },
   Author: {
     bookCount: root => books.filter(b => b.author === root.name).length,
+  },
+  Mutation: {
+    addBook: (root, args) => {
+      if (books.find(b => b.title === args.title)) {
+        throw new UserInputError('Title must be unique', {
+          invalidArgs: args.name,
+        })
+      }
+      const newBook = { ...args, id: uuid() }
+      books = books.concat(newBook)
+      return newBook
+    },
+    editAuthor: (root, args) => {
+      if (!args.name || !args.setBornTo) return null
+      if (!authors.find(a => a.name == args.name)) return null
+      const author = authors.find(a => a.name == args.name)
+      const authorToEdit = { ...author, born: args.setBornTo }
+      authors = authors.map(a =>
+        a.name === authorToEdit.name ? authorToEdit : a
+      )
+      return authorToEdit
+    },
   },
 }
 
