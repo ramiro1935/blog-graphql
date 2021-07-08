@@ -27,12 +27,13 @@ mongoose
 const typeDefs = gql`
   type Author {
     name: String!
-    bookCount: Int!
+    bookCount: Int
     born: Int
     id: ID!
   }
   type User {
     username: String!
+    favoriteGenre: String
   }
   type Book {
     title: String!
@@ -50,6 +51,8 @@ const typeDefs = gql`
     authorCount: Int!
     allBooks(author: String, genre: String): [Book!]!
     allAuthors: [Author!]!
+    allGenres: [String!]!
+    me: User!
   }
 
   type Mutation {
@@ -61,7 +64,7 @@ const typeDefs = gql`
     ): Book
     editAuthor(name: String!, setBornTo: Int!): Author
     login(username: String!, password: String!): Token!
-    addUser(username: String!): User!
+    addUser(username: String!, favoriteGenre: String!): User!
   }
 `
 
@@ -69,20 +72,37 @@ const resolvers = {
   Query: {
     bookCount: () => Book.collection.countDocuments(),
     authorCount: () => Author.collection.countDocuments(),
-    allBooks: (root, args) => {
-      /*let booksAtEnd = [...books]
-      if (!args.author && !args.genre) return books
-      if (args.author)
-        booksAtEnd = booksAtEnd.filter(b => b.author === args.author)
+    allBooks: async (root, args) => {
+      const author = await Author.findOne({ name: args.author })
+      if (args.author && author && args.genre) {
+        return Book.find({ author: author._id, genres: args.genre }).populate(
+          'author'
+        )
+      }
+      if (args.author && author) {
+        return Book.find({ author: author._id }).populate('author')
+      }
       if (args.genre)
-        booksAtEnd = booksAtEnd.filter(b => b.genres.includes(args.genre))
-      return booksAtEnd*/
+        return Book.find({ genres: args.genre }).populate('author')
       return Book.find({}).populate('author')
     },
     allAuthors: () => Author.find({}),
+    me: (root, args, { currentUser }) => currentUser,
+    allGenres: async () => {
+      const books = await Book.find({}).select('genres')
+      const genres = books
+        .map(b => b.genres)
+        .reduce((acc, act) => {
+          return (acc = [...acc, ...act])
+        }, [])
+      return new Set(genres)
+    },
   },
   Author: {
-    bookCount: root => books.filter(b => b.author === root.name).length,
+    bookCount: async root => {
+      const books = await Book.find({ author: root._id })
+      return books.length
+    },
   },
   Mutation: {
     addBook: async (root, args) => {
@@ -138,7 +158,7 @@ const server = new ApolloServer({
   context: async ({ req }) => {
     const auth = req ? req.headers.authorization : null
     if (auth && auth.toLowerCase().startsWith('bearer ')) {
-      const decodedToken = jwt.verify(auth.substrings(7), JSON_SECRET)
+      const decodedToken = jwt.verify(auth.substring(7), JSON_SECRET)
       const currentUser = await User.findById(decodedToken.id)
       return { currentUser }
     }
