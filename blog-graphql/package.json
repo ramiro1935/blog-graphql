@@ -1,0 +1,24 @@
+{
+  "name": "part8",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon --delay 500ms index.js localhost 4000"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@apollo/client": "^3.3.20",
+    "apollo-server": "^2.25.2",
+    "graphql": "^15.5.1",
+    "jsonwebtoken": "^8.5.1",
+    "mongoose": "^5.13.2",
+    "nodemon": "^2.0.9",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "kill-port": "^1.6.1"
+  }
+}
